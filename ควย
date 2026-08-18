@@ -1,0 +1,166 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Debris = game:GetService("Debris")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+-- ตัวแปรสถานะ
+local states = {
+	infiniteJump = false,
+	flying = false,
+	noclip = false,
+	godMode = false,
+	knockback = false, -- เพิ่มสถานะ Knockback
+	flySpeed = 50,
+	walkSpeed = 16,
+	savedCFrame = nil
+}
+
+-- ฟังก์ชันจัดการ Knockback
+local function onTouch(hit)
+	if not states.knockback then return end
+	local targetChar = hit.Parent
+	local targetHumanoid = targetChar:FindFirstChild("Humanoid")
+	local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+
+	if targetHumanoid and targetRoot and targetChar ~= character then
+		-- สร้างแรงผลัก
+		local bodyVelocity = Instance.new("BodyVelocity")
+		bodyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+		-- คำนวณทิศทางผลัก (ออกจากตัวเรา)
+		local pushDir = (targetRoot.Position - rootPart.Position).Unit
+		bodyVelocity.Velocity = (pushDir + Vector3.new(0, 0.5, 0)) * 70 -- แรงผลัก 70
+		bodyVelocity.Parent = targetRoot
+		Debris:AddItem(bodyVelocity, 0.3) -- แรงอยู่แค่ 0.3 วินาที
+	end
+end
+
+-- ฟังชันอัปเดตตัวละคร
+local function setupCharacter(char)
+	character = char
+	humanoid = char:WaitForChild("Humanoid")
+	rootPart = char:WaitForChild("HumanoidRootPart")
+	humanoid.WalkSpeed = states.walkSpeed
+	
+	-- เชื่อมต่อระบบแตะ (Touch) กับทุกส่วนของตัวละคร
+	for _, part in pairs(character:GetChildren()) do
+		if part:IsA("BasePart") then
+			part.Touched:Connect(onTouch)
+		end
+	end
+end
+
+player.CharacterAdded:Connect(setupCharacter)
+setupCharacter(character) -- เรียกใช้ครั้งแรก
+
+-- [ระบบเดิม: Jump, GodMode, Noclip, Fly เหมือนเดิม]
+UserInputService.JumpRequest:Connect(function()
+	if states.infiniteJump and humanoid then humanoid:ChangeState(Enum.HumanoidStateType.Jumping) end
+end)
+
+RunService.Heartbeat:Connect(function()
+	if states.godMode and humanoid and humanoid.Health < humanoid.MaxHealth then humanoid.Health = humanoid.MaxHealth end
+end)
+
+RunService.Stepped:Connect(function()
+	if states.noclip and character then
+		for _, part in ipairs(character:GetDescendants()) do
+			if part:IsA("BasePart") and part.CanCollide then part.CanCollide = false end
+		end
+	end
+end)
+
+-- ระบบบิน (คงเดิม)
+local bodyVelocity, bodyGyro
+local function startFlying()
+	if states.flying or not rootPart then return end
+	states.flying = true
+	bodyVelocity = Instance.new("BodyVelocity", rootPart)
+	bodyVelocity.MaxForce = Vector3.new(1e8, 1e8, 1e8)
+	bodyGyro = Instance.new("BodyGyro", rootPart)
+	bodyGyro.MaxTorque = Vector3.new(1e8, 1e8, 1e8)
+	humanoid.PlatformStand = true
+	task.spawn(function()
+		while states.flying and character and rootPart do
+			local camera = workspace.CurrentCamera
+			local move = Vector3.zero
+			if UserInputService:IsKeyDown(Enum.KeyCode.W) then move += camera.CFrame.LookVector end
+			if UserInputService:IsKeyDown(Enum.KeyCode.S) then move -= camera.CFrame.LookVector end
+			if UserInputService:IsKeyDown(Enum.KeyCode.A) then move -= camera.CFrame.RightVector end
+			if UserInputService:IsKeyDown(Enum.KeyCode.D) then move += camera.CFrame.RightVector end
+			bodyVelocity.Velocity = (move.Magnitude > 0 and move.Unit or Vector3.zero) * states.flySpeed
+			bodyGyro.CFrame = camera.CFrame
+			RunService.RenderStepped:Wait()
+		end
+	end)
+end
+
+local function stopFlying()
+	states.flying = false
+	if humanoid then humanoid.PlatformStand = false end
+	if bodyVelocity then bodyVelocity:Destroy() end
+	if bodyGyro then bodyGyro:Destroy() end
+end
+
+-- สร้าง GUI
+local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 750, 0, 50)
+frame.Position = UDim2.new(0.5, -375, 0.9, -60)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+
+local layout = Instance.new("UIListLayout", frame)
+layout.FillDirection = Enum.FillDirection.Horizontal
+layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+layout.Padding = UDim.new(0, 5)
+
+-- ปุ่ม Toggle GUI
+local toggleBtn = Instance.new("TextButton", gui)
+toggleBtn.Size = UDim2.new(0, 40, 0, 40)
+toggleBtn.Position = UDim2.new(0, 10, 0.5, -20)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(128, 0, 128)
+toggleBtn.Text = "GUI"
+toggleBtn.TextColor3 = Color3.new(1, 1, 1)
+toggleBtn.Draggable = true
+toggleBtn.MouseButton1Click:Connect(function() frame.Visible = not frame.Visible end)
+
+-- ฟังก์ชันสร้างปุ่ม
+local function addButton(text, color, func)
+	local btn = Instance.new("TextButton", frame)
+	btn.Size = UDim2.new(0, 70, 0, 40)
+	btn.BackgroundColor3 = color
+	btn.Text = text
+	btn.MouseButton1Click:Connect(func)
+end
+
+-- ปุ่มต่างๆ
+addButton("Jump", Color3.fromRGB(180, 50, 50), function() states.infiniteJump = not states.infiniteJump end)
+addButton("Fly", Color3.fromRGB(180, 50, 50), function() if states.flying then stopFlying() else startFlying() end end)
+addButton("Noclip", Color3.fromRGB(180, 50, 50), function() states.noclip = not states.noclip end)
+addButton("God", Color3.fromRGB(180, 50, 50), function() states.godMode = not states.godMode end)
+addButton("Knock", Color3.fromRGB(200, 150, 50), function() states.knockback = not states.knockback end) -- ปุ่ม Knockback
+
+-- ช่องใส่ความเร็ว
+local function addBox(placeholder, speedType)
+	local box = Instance.new("TextBox", frame)
+	box.Size = UDim2.new(0, 70, 0, 40)
+	box.PlaceholderText = placeholder
+	box.FocusLost:Connect(function()
+		local val = tonumber(box.Text)
+		if val then 
+			if speedType == "fly" then states.flySpeed = math.clamp(val, 1, 1000)
+			else states.walkSpeed = math.clamp(val, 1, 1000) humanoid.WalkSpeed = states.walkSpeed end
+		end
+	end)
+end
+
+addBox("FlySpd", "fly")
+addBox("WalkSpd", "walk")
+
+-- Waypoints
+addButton("Set/Res", Color3.fromRGB(70, 130, 180), function() if rootPart then states.savedCFrame = rootPart.CFrame humanoid.Health = 0 end end)
+addButton("TP", Color3.fromRGB(140, 70, 180), function() if states.savedCFrame and rootPart then rootPart.CFrame = states.savedCFrame end end)
