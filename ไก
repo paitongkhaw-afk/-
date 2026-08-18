@@ -1,0 +1,75 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local player = game.Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local Debris = game:GetService("Debris")
+
+local states = { infiniteJump = false, noclip = false, godMode = false, knockback = false, invisible = false, walkSpeed = 16, savedCFrame = nil }
+
+-- ฟังก์ชันผลักคนอื่น
+local function applyKnockback(targetPart)
+    if not states.knockback then return end
+    local char = targetPart.Parent
+    local hum = char:FindFirstChild("Humanoid")
+    local root = char:FindFirstChild("HumanoidRootPart")
+    -- เช็คว่าไม่ใช่ตัวเรา และมี Humanoid
+    if hum and root and char ~= player.Character then
+        local vel = Instance.new("BodyVelocity")
+        vel.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+        local dir = (root.Position - player.Character.HumanoidRootPart.Position).Unit
+        vel.Velocity = (dir + Vector3.new(0, 1, 0)) * 600
+        vel.Parent = root
+        Debris:AddItem(vel, 0.5)
+    end
+end
+
+-- ระบบ Setup ตัวละคร (ทำงานใหม่ทุกครั้งที่เกิด)
+local function setupLogic()
+    local char = player.Character or player.CharacterAdded:Wait()
+    local root = char:WaitForChild("HumanoidRootPart")
+    local hum = char:WaitForChild("Humanoid")
+    
+    root.Touched:Connect(function(hit) if states.knockback then applyKnockback(hit) end end)
+    hum.WalkSpeed = states.walkSpeed
+end
+
+player.CharacterAdded:Connect(setupLogic)
+setupLogic()
+
+-- สร้าง GUI
+local Window = Rayfield:CreateWindow({Name = "pai | Script", LoadingTitle = "Loading...", LoadingSubtitle = "by pai", ConfigurationSaving = {Enabled = false}})
+local MainTab = Window:CreateTab("เมนูหลัก", nil)
+
+MainTab:CreateToggle({Name = "กระโดดไม่จำกัด", Callback = function(v) states.infiniteJump = v end})
+MainTab:CreateToggle({Name = "อมตะ (God Mode)", Callback = function(v) states.godMode = v end})
+MainTab:CreateToggle({Name = "ทะลุกำแพง (Noclip)", Callback = function(v) states.noclip = v end})
+MainTab:CreateToggle({Name = "ล่องหน", Callback = function(v) 
+    states.invisible = v
+    for _, p in pairs(player.Character:GetDescendants()) do
+        if p:IsA("BasePart") or p:IsA("Decal") then p.Transparency = v and 1 or 0 end
+    end
+end})
+MainTab:CreateToggle({Name = "ผลักคนอื่นกระเด็น (Knockback)", Callback = function(v) states.knockback = v end})
+
+local MoveTab = Window:CreateTab("การเคลื่อนที่", nil)
+MoveTab:CreateSlider({Name = "ความเร็วเดิน", Range = {16, 500}, CurrentValue = 16, Callback = function(v) 
+    states.walkSpeed = v
+    if player.Character and player.Character:FindFirstChild("Humanoid") then player.Character.Humanoid.WalkSpeed = v end
+end})
+MoveTab:CreateButton({Name = "บันทึกจุด (Save)", Callback = function() if player.Character then states.savedCFrame = player.Character.HumanoidRootPart.CFrame end end})
+MoveTab:CreateButton({Name = "วาร์ปกลับจุด (TP)", Callback = function() if states.savedCFrame then player.Character.HumanoidRootPart.CFrame = states.savedCFrame end end})
+
+-- Loop อัปเดตสถานะ
+RunService.Heartbeat:Connect(function()
+    if not player.Character then return end
+    -- God Mode
+    if states.godMode then
+        local hum = player.Character:FindFirstChild("Humanoid")
+        if hum then hum.MaxHealth = math.huge; hum.Health = math.huge end
+    end
+    -- Noclip
+    if states.noclip then
+        for _, p in pairs(player.Character:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end
+    end
+end)
+
+game:GetService("UserInputService").JumpRequest:Connect(function() if states.infiniteJump then player.Character.Humanoid:ChangeState(3) end end)
