@@ -1,0 +1,51 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local player = game.Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local Debris = game:GetService("Debris")
+local states = { infiniteJump = false, flying = false, noclip = false, godMode = false, knockback = false, flySpeed = 50, walkSpeed = 16, savedCFrame = nil }
+
+local function applyKnockback(targetPart)
+    if not states.knockback then return end
+    local char = targetPart.Parent
+    local hum = char:FindFirstChild("Humanoid")
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if hum and root and char ~= player.Character then
+        local vel = Instance.new("BodyVelocity")
+        vel.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+        local dir = (root.Position - player.Character.HumanoidRootPart.Position).Unit
+        vel.Velocity = (dir + Vector3.new(0, 1, 0)) * 600
+        vel.Parent = root
+        Debris:AddItem(vel, 0.3)
+    end
+end
+
+local function setupLogic()
+    local char = player.Character or player.CharacterAdded:Wait()
+    local root = char:WaitForChild("HumanoidRootPart")
+    root.Touched:Connect(function(hit) if states.knockback then applyKnockback(hit) end end)
+    char:WaitForChild("Humanoid").WalkSpeed = states.walkSpeed
+end
+
+player.CharacterAdded:Connect(setupLogic)
+setupLogic()
+
+local Window = Rayfield:CreateWindow({Name = "God Modder System", LoadingTitle = "Loading...", LoadingSubtitle = "by Expert", ConfigurationSaving = {Enabled = false}})
+local MainTab = Window:CreateTab("Main", nil)
+
+MainTab:CreateToggle({Name = "Infinite Jump", Callback = function(v) states.infiniteJump = v end})
+MainTab:CreateToggle({Name = "God Mode (Auto Heal)", Callback = function(v) states.godMode = v end})
+MainTab:CreateToggle({Name = "Noclip", Callback = function(v) states.noclip = v end})
+MainTab:CreateToggle({Name = "Knockback (Walk into Fling)", Callback = function(v) states.knockback = v end})
+
+local MoveTab = Window:CreateTab("Movement", nil)
+MoveTab:CreateSlider({Name = "WalkSpeed", Range = {16, 500}, CurrentValue = 16, Callback = function(v) states.walkSpeed = v; if player.Character then player.Character.Humanoid.WalkSpeed = v end end})
+MoveTab:CreateButton({Name = "Save Waypoint", Callback = function() if player.Character then states.savedCFrame = player.Character.HumanoidRootPart.CFrame end end})
+MoveTab:CreateButton({Name = "Teleport", Callback = function() if states.savedCFrame then player.Character.HumanoidRootPart.CFrame = states.savedCFrame end end})
+
+RunService.Heartbeat:Connect(function()
+    if not player.Character then return end
+    if states.godMode then player.Character.Humanoid.Health = player.Character.Humanoid.MaxHealth end
+    if states.noclip then for _, p in pairs(player.Character:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end end
+end)
+
+game:GetService("UserInputService").JumpRequest:Connect(function() if states.infiniteJump then player.Character.Humanoid:ChangeState(3) end end)
