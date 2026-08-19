@@ -1,0 +1,975 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Lighting = game:GetService("Lighting")
+
+--------------------------------------------------
+-- CONFIG
+--------------------------------------------------
+
+local ADMINS = {
+	[123456789] = true, -- เปลี่ยนเป็น UserId ของมึง
+}
+
+local DEFAULT_SPEED = 16
+local DEFAULT_JUMP = 50
+
+--------------------------------------------------
+-- REMOTE
+--------------------------------------------------
+
+local Remote = Instance.new("RemoteEvent")
+Remote.Name = "AdminTestRemote"
+Remote.Parent = ReplicatedStorage
+
+--------------------------------------------------
+-- ADMIN CHECK
+--------------------------------------------------
+
+local function isAdmin(player)
+	return ADMINS[player.UserId] == true
+end
+
+--------------------------------------------------
+-- CHARACTER
+--------------------------------------------------
+
+local function setupCharacter(player, character)
+
+	local hum = character:WaitForChild("Humanoid")
+
+	if player:GetAttribute("GodMode") then
+		hum.MaxHealth = math.huge
+		hum.Health = math.huge
+	end
+
+	hum.HealthChanged:Connect(function()
+
+		if player:GetAttribute("GodMode") then
+			hum.Health = math.huge
+		end
+
+	end)
+end
+
+--------------------------------------------------
+-- PLAYER
+--------------------------------------------------
+
+Players.PlayerAdded:Connect(function(player)
+
+	if not isAdmin(player) then
+		return
+	end
+
+	player:SetAttribute("AdminTest", true)
+	player:SetAttribute("GodMode", false)
+	player:SetAttribute("PushPower", 100)
+
+	player.CharacterAdded:Connect(function(character)
+		setupCharacter(player, character)
+	end)
+
+	--------------------------------------------------
+	-- GUI
+	--------------------------------------------------
+
+	player.CharacterAppearanceLoaded:Connect(function()
+
+		local playerGui = player:WaitForChild("PlayerGui")
+
+		local old = playerGui:FindFirstChild("AdminTestGUI")
+
+		if old then
+			old:Destroy()
+		end
+
+		local gui = Instance.new("ScreenGui")
+		gui.Name = "AdminTestGUI"
+		gui.ResetOnSpawn = false
+		gui.Parent = playerGui
+
+		--------------------------------------------------
+		-- MAIN
+		--------------------------------------------------
+
+		local main = Instance.new("Frame")
+		main.Size = UDim2.fromOffset(330, 500)
+		main.Position = UDim2.new(0, 20, 0.5, -250)
+		main.BackgroundColor3 = Color3.fromRGB(24,24,30)
+		main.BorderSizePixel = 0
+		main.Parent = gui
+
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0,12)
+		corner.Parent = main
+
+		--------------------------------------------------
+		-- TITLE
+		--------------------------------------------------
+
+		local title = Instance.new("TextLabel")
+		title.Size = UDim2.new(1,-20,0,45)
+		title.Position = UDim2.fromOffset(10,5)
+		title.BackgroundTransparency = 1
+		title.Text = "ADMIN TEST PANEL"
+		title.TextColor3 = Color3.new(1,1,1)
+		title.TextSize = 20
+		title.Font = Enum.Font.GothamBold
+		title.Parent = main
+
+		--------------------------------------------------
+		-- SCROLL
+		--------------------------------------------------
+
+		local scroll = Instance.new("ScrollingFrame")
+		scroll.Size = UDim2.new(1,-20,1,-60)
+		scroll.Position = UDim2.fromOffset(10,55)
+		scroll.BackgroundTransparency = 1
+		scroll.BorderSizePixel = 0
+		scroll.ScrollBarThickness = 4
+		scroll.CanvasSize = UDim2.new(0,0,0,1000)
+		scroll.Parent = main
+
+		local layout = Instance.new("UIListLayout")
+		layout.Padding = UDim.new(0,7)
+		layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		layout.Parent = scroll
+
+		--------------------------------------------------
+		-- BUTTON
+		--------------------------------------------------
+
+		local function button(text)
+
+			local b = Instance.new("TextButton")
+
+			b.Size = UDim2.fromOffset(290,38)
+			b.BackgroundColor3 = Color3.fromRGB(42,42,52)
+			b.TextColor3 = Color3.new(1,1,1)
+			b.Text = text
+			b.TextSize = 14
+			b.Font = Enum.Font.Gotham
+			b.AutoButtonColor = true
+			b.Parent = scroll
+
+			local c = Instance.new("UICorner")
+			c.CornerRadius = UDim.new(0,8)
+			c.Parent = b
+
+			return b
+		end
+
+		local function slider(name,min,max,default,callback)
+
+			local holder = Instance.new("Frame")
+
+			holder.Size = UDim2.fromOffset(290,65)
+			holder.BackgroundColor3 = Color3.fromRGB(35,35,44)
+			holder.Parent = scroll
+
+			local c = Instance.new("UICorner")
+			c.CornerRadius = UDim.new(0,8)
+			c.Parent = holder
+
+			local label = Instance.new("TextLabel")
+
+			label.Size = UDim2.new(1,-20,0,25)
+			label.Position = UDim2.fromOffset(10,3)
+			label.BackgroundTransparency = 1
+			label.Text = name .. ": " .. default
+			label.TextColor3 = Color3.new(1,1,1)
+			label.TextSize = 14
+			label.Font = Enum.Font.Gotham
+			label.TextXAlignment = Enum.TextXAlignment.Left
+			label.Parent = holder
+
+			local bar = Instance.new("Frame")
+
+			bar.Size = UDim2.new(1,-30,0,7)
+			bar.Position = UDim2.fromOffset(15,42)
+			bar.BackgroundColor3 = Color3.fromRGB(70,70,80)
+			bar.BorderSizePixel = 0
+			bar.Parent = holder
+
+			local bc = Instance.new("UICorner")
+			bc.CornerRadius = UDim.new(1,0)
+			bc.Parent = bar
+
+			local fill = Instance.new("Frame")
+
+			fill.Size = UDim2.new(
+				(default-min)/(max-min),
+				0,1,0
+			)
+
+			fill.BackgroundColor3 = Color3.fromRGB(120,80,255)
+			fill.BorderSizePixel = 0
+			fill.Parent = bar
+
+			local fc = Instance.new("UICorner")
+			fc.CornerRadius = UDim.new(1,0)
+			fc.Parent = fill
+
+			local dragging = false
+
+			bar.InputBegan:Connect(function(input)
+
+				if input.UserInputType ==
+					Enum.UserInputType.MouseButton1
+					or input.UserInputType ==
+					Enum.UserInputType.Touch then
+
+					dragging = true
+				end
+
+			end)
+
+			bar.InputEnded:Connect(function(input)
+
+				if input.UserInputType ==
+					Enum.UserInputType.MouseButton1
+					or input.UserInputType ==
+					Enum.UserInputType.Touch then
+
+					dragging = false
+				end
+
+			end)
+
+			RunService.Heartbeat:Connect(function()
+
+				if not dragging then
+					return
+				end
+
+				local mouse =
+					game:GetService("UserInputService")
+					:GetMouseLocation()
+
+				local x =
+					math.clamp(
+						mouse.X - bar.AbsolutePosition.X,
+						0,
+						bar.AbsoluteSize.X
+					)
+
+				local percent =
+					x / bar.AbsoluteSize.X
+
+				local value =
+					math.floor(
+						min + (max-min)*percent + .5
+					)
+
+				fill.Size =
+					UDim2.new(percent,0,1,0)
+
+				label.Text =
+					name .. ": " .. value
+
+				callback(value)
+
+			end)
+
+		end
+
+		--------------------------------------------------
+		-- MOVEMENT
+		--------------------------------------------------
+
+		local movement = Instance.new("TextLabel")
+		movement.Size = UDim2.fromOffset(290,30)
+		movement.BackgroundTransparency = 1
+		movement.Text = "MOVEMENT"
+		movement.TextColor3 = Color3.fromRGB(180,150,255)
+		movement.TextSize = 16
+		movement.Font = Enum.Font.GothamBold
+		movement.Parent = scroll
+
+		local noclip = false
+		local infiniteJump = false
+
+		local noclipButton =
+			button("Noclip: OFF")
+
+		noclipButton.MouseButton1Click:Connect(function()
+
+			noclip = not noclip
+
+			noclipButton.Text =
+				"Noclip: " ..
+				(noclip and "ON" or "OFF")
+
+		end)
+
+		local jumpButton =
+			button("Infinite Jump: OFF")
+
+		jumpButton.MouseButton1Click:Connect(function()
+
+			infiniteJump = not infiniteJump
+
+			jumpButton.Text =
+				"Infinite Jump: " ..
+				(infiniteJump and "ON" or "OFF")
+
+		end)
+
+		local godButton =
+			button("God Mode: OFF")
+
+		godButton.MouseButton1Click:Connect(function()
+
+			local value =
+				not player:GetAttribute("GodMode")
+
+			player:SetAttribute(
+				"GodMode",
+				value
+			)
+
+			godButton.Text =
+				"God Mode: " ..
+				(value and "ON" or "OFF")
+
+			Remote:FireClient(
+				player,
+				"GodMode",
+				value
+			)
+
+		end)
+
+		slider(
+			"Walk Speed",
+			16,
+			150,
+			16,
+			function(value)
+
+				local char = player.Character
+				local hum =
+					char and
+					char:FindFirstChildOfClass("Humanoid")
+
+				if hum then
+					hum.WalkSpeed = value
+				end
+
+			end
+		)
+
+		slider(
+			"Jump Power",
+			50,
+			200,
+			50,
+			function(value)
+
+				local char = player.Character
+				local hum =
+					char and
+					char:FindFirstChildOfClass("Humanoid")
+
+				if hum then
+
+					hum.UseJumpPower = true
+					hum.JumpPower = value
+
+				end
+
+			end
+		)
+
+		--------------------------------------------------
+		-- ESP
+		--------------------------------------------------
+
+		local visual = Instance.new("TextLabel")
+
+		visual.Size = UDim2.fromOffset(290,30)
+		visual.BackgroundTransparency = 1
+		visual.Text = "VISUAL"
+		visual.TextColor3 =
+			Color3.fromRGB(180,150,255)
+		visual.TextSize = 16
+		visual.Font = Enum.Font.GothamBold
+		visual.Parent = scroll
+
+		local esp = false
+
+		local espButton =
+			button("ESP: OFF")
+
+		espButton.MouseButton1Click:Connect(function()
+
+			esp = not esp
+
+			espButton.Text =
+				"ESP: " ..
+				(esp and "ON" or "OFF")
+
+		end)
+
+		local rainbow =
+			button("Rainbow Lines: OFF")
+
+		local rainbowEnabled = false
+
+		rainbow.MouseButton1Click:Connect(function()
+
+			rainbowEnabled =
+				not rainbowEnabled
+
+			rainbow.Text =
+				"Rainbow Lines: " ..
+				(rainbowEnabled and "ON" or "OFF")
+
+		end)
+
+		--------------------------------------------------
+		-- COMBAT
+		--------------------------------------------------
+
+		local combat = Instance.new("TextLabel")
+
+		combat.Size = UDim2.fromOffset(290,30)
+		combat.BackgroundTransparency = 1
+		combat.Text = "COMBAT"
+		combat.TextColor3 =
+			Color3.fromRGB(180,150,255)
+		combat.TextSize = 16
+		combat.Font = Enum.Font.GothamBold
+		combat.Parent = scroll
+
+		slider(
+			"Push Power",
+			0,
+			500,
+			100,
+			function(value)
+
+				player:SetAttribute(
+					"PushPower",
+					value
+				)
+
+			end
+		)
+
+		local pushButton =
+			button("Push Nearby Players")
+
+		pushButton.MouseButton1Click:Connect(function()
+
+			local char = player.Character
+
+			local root =
+				char and
+				char:FindFirstChild("HumanoidRootPart")
+
+			if not root then
+				return
+			end
+
+			local power =
+				player:GetAttribute("PushPower")
+				or 100
+
+			for _,target in ipairs(
+				Players:GetPlayers()
+			) do
+
+				if target ~= player then
+
+					local tc =
+						target.Character
+
+					local tr =
+						tc and
+						tc:FindFirstChild(
+							"HumanoidRootPart"
+						)
+
+					if tr then
+
+						local distance =
+							(root.Position -
+							tr.Position).Magnitude
+
+						if distance <= 7 then
+
+							local direction =
+								(tr.Position -
+								root.Position)
+
+							if direction.Magnitude > 0 then
+
+								direction =
+									direction.Unit
+
+							else
+
+								direction =
+									root.CFrame.LookVector
+
+							end
+
+							tr.AssemblyLinearVelocity =
+								direction * power +
+								Vector3.new(
+									0,
+									power * .5,
+									0
+								)
+
+						end
+					end
+				end
+			end
+		end)
+
+		--------------------------------------------------
+		-- PERFORMANCE
+		--------------------------------------------------
+
+		local performance =
+			Instance.new("TextLabel")
+
+		performance.Size =
+			UDim2.fromOffset(290,30)
+
+		performance.BackgroundTransparency = 1
+		performance.Text = "PERFORMANCE"
+		performance.TextColor3 =
+			Color3.fromRGB(180,150,255)
+
+		performance.TextSize = 16
+		performance.Font =
+			Enum.Font.GothamBold
+
+		performance.Parent = scroll
+
+		local fps =
+			Instance.new("TextLabel")
+
+		fps.Size =
+			UDim2.fromOffset(290,35)
+
+		fps.BackgroundColor3 =
+			Color3.fromRGB(35,35,44)
+
+		fps.TextColor3 =
+			Color3.new(1,1,1)
+
+		fps.Text =
+			"FPS: ..."
+
+		fps.TextSize = 15
+		fps.Font =
+			Enum.Font.GothamBold
+
+		fps.Parent = scroll
+
+		local frames = 0
+		local last = os.clock()
+
+		RunService.Heartbeat:Connect(function()
+
+			frames += 1
+
+			local now = os.clock()
+
+			if now-last >= 1 then
+
+				fps.Text =
+					"FPS: " .. frames
+
+				frames = 0
+				last = now
+
+			end
+		end)
+
+		local clean =
+			button("Clean Unnecessary Effects")
+
+		clean.MouseButton1Click:Connect(function()
+
+			for _,object in ipairs(
+				workspace:GetDescendants()
+			) do
+
+				if object:IsA("ParticleEmitter")
+				or object:IsA("Trail")
+				or object:IsA("Smoke")
+				or object:IsA("Fire") then
+
+					object.Enabled = false
+
+				end
+			end
+
+		end)
+
+		local plasticine =
+			button("Plasticine Visual: OFF")
+
+		local plasticineOn = false
+
+		plasticine.MouseButton1Click:Connect(function()
+
+			plasticineOn =
+				not plasticineOn
+
+			plasticine.Text =
+				"Plasticine Visual: " ..
+				(plasticineOn and "ON" or "OFF")
+
+			for _,object in ipairs(
+				workspace:GetDescendants()
+			) do
+
+				if object:IsA("BasePart") then
+
+					object.Material =
+						plasticineOn
+						and Enum.Material.SmoothPlastic
+						or Enum.Material.Plastic
+
+				end
+			end
+
+		end)
+
+		--------------------------------------------------
+		-- LANGUAGE
+		--------------------------------------------------
+
+		local settings =
+			Instance.new("TextLabel")
+
+		settings.Size =
+			UDim2.fromOffset(290,30)
+
+		settings.BackgroundTransparency = 1
+		settings.Text = "SETTINGS"
+		settings.TextColor3 =
+			Color3.fromRGB(180,150,255)
+
+		settings.TextSize = 16
+		settings.Font =
+			Enum.Font.GothamBold
+
+		settings.Parent = scroll
+
+		local language =
+			button("ภาษา: ไทย")
+
+		local thai = true
+
+		language.MouseButton1Click:Connect(function()
+
+			thai = not thai
+
+			language.Text =
+				thai
+				and "ภาษา: ไทย"
+				or "Language: English"
+
+		end)
+
+		--------------------------------------------------
+		-- NOCLIP LOOP
+		--------------------------------------------------
+
+		RunService.Stepped:Connect(function()
+
+			if not noclip then
+				return
+			end
+
+			local character =
+				player.Character
+
+			if not character then
+				return
+			end
+
+			for _,object in ipairs(
+				character:GetDescendants()
+			) do
+
+				if object:IsA("BasePart") then
+					object.CanCollide = false
+				end
+
+			end
+		end)
+
+		--------------------------------------------------
+		-- INFINITE JUMP
+		--------------------------------------------------
+
+		UserInputService.JumpRequest:Connect(function()
+
+			if not infiniteJump then
+				return
+			end
+
+			local character =
+				player.Character
+
+			local hum =
+				character and
+				character:FindFirstChildOfClass(
+					"Humanoid"
+				)
+
+			if hum then
+
+				hum:ChangeState(
+					Enum.HumanoidStateType.Jumping
+				)
+
+			end
+
+		end)
+
+		--------------------------------------------------
+		-- ESP LOOP
+		--------------------------------------------------
+
+		local espFolder =
+			Instance.new("Folder")
+
+		espFolder.Name =
+			"AdminESP"
+
+		espFolder.Parent = workspace
+
+		RunService.Heartbeat:Connect(function()
+
+			for _,v in ipairs(
+				espFolder:GetChildren()
+			) do
+				v:Destroy()
+			end
+
+			if not esp then
+				return
+			end
+
+			local myChar =
+				player.Character
+
+			local myRoot =
+				myChar and
+				myChar:FindFirstChild(
+					"HumanoidRootPart"
+				)
+
+			if not myRoot then
+				return
+			end
+
+			for _,target in ipairs(
+				Players:GetPlayers()
+			) do
+
+				if target ~= player then
+
+					local char =
+						target.Character
+
+					local root =
+						char and
+						char:FindFirstChild(
+							"HumanoidRootPart"
+						)
+
+					if root then
+
+						-- ชื่อ
+						local billboard =
+							Instance.new(
+								"BillboardGui"
+							)
+
+						billboard.Size =
+							UDim2.fromOffset(
+								150,
+								40
+							)
+
+						billboard.AlwaysOnTop =
+							true
+
+						billboard.Adornee =
+							root
+
+						billboard.Parent =
+							espFolder
+
+						local label =
+							Instance.new(
+								"TextLabel"
+							)
+
+						label.Size =
+							UDim2.fromScale(
+								1,
+								1
+							)
+
+						label.BackgroundTransparency =
+							1
+
+						label.Text =
+							target.DisplayName
+
+						label.TextColor3 =
+							Color3.new(
+								1,
+								1,
+								1
+							)
+
+						label.TextStrokeTransparency =
+							0
+
+						label.TextSize = 14
+
+						label.Font =
+							Enum.Font.GothamBold
+
+						label.Parent =
+							billboard
+
+						-- เส้น
+						if rainbowEnabled then
+
+							local a0 =
+								Instance.new(
+									"Attachment"
+								)
+
+							a0.Parent =
+								myRoot
+
+							local a1 =
+								Instance.new(
+									"Attachment"
+								)
+
+							a1.Parent =
+								root
+
+							local beam =
+								Instance.new(
+									"Beam"
+								)
+
+							beam.Attachment0 =
+								a0
+
+							beam.Attachment1 =
+								a1
+
+							beam.Width0 = .08
+							beam.Width1 = .08
+							beam.FaceCamera = true
+							beam.LightEmission = 1
+
+							local hue =
+								(os.clock() % 5) / 5
+
+							beam.Color =
+								ColorSequence.new(
+									Color3.fromHSV(
+										hue,
+										1,
+										1
+									)
+								)
+
+							beam.Parent =
+								espFolder
+						end
+					end
+				end
+			end
+		end)
+
+	end)
+
+end)
+
+--------------------------------------------------
+-- REMOTE SECURITY
+--------------------------------------------------
+
+Remote.OnServerEvent:Connect(function(player, action, value)
+
+	if not isAdmin(player) then
+		return
+	end
+
+	local character =
+		player.Character
+
+	local hum =
+		character and
+		character:FindFirstChildOfClass(
+			"Humanoid"
+		)
+
+	if not hum then
+		return
+	end
+
+	if action == "Speed" then
+
+		hum.WalkSpeed =
+			math.clamp(
+				tonumber(value) or 16,
+				16,
+				150
+			)
+
+	elseif action == "Jump" then
+
+		hum.UseJumpPower = true
+
+		hum.JumpPower =
+			math.clamp(
+				tonumber(value) or 50,
+				50,
+				200
+			)
+
+	elseif action == "GodMode" then
+
+		player:SetAttribute(
+			"GodMode",
+			value == true
+		)
+
+		if value then
+
+			hum.MaxHealth =
+				math.huge
+
+			hum.Health =
+				math.huge
+
+		else
+
+			hum.MaxHealth = 100
+			hum.Health = 100
+
+		end
+
+	end
+end)
